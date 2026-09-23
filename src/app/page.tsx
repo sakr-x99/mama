@@ -5,28 +5,29 @@ import Nav from "@/components/Nav";
 import {
   KEYS,
   useLocalState,
+  migrateStudents,
   type AttendanceRecord,
+  type Group,
   type Payment,
-  type ScheduleItem,
   type Student,
   formatMoney,
-  formatDate,
   today,
+  weekdayOf,
+  groupSessions,
 } from "@/lib/store";
 
 export default function Home() {
-  const [students] = useLocalState<Student[]>(KEYS.students, []);
-  const [schedule] = useLocalState<ScheduleItem[]>(KEYS.schedule, []);
+  const [groups] = useLocalState<Group[]>(KEYS.groups, []);
+  const [students] = useLocalState<Student[]>(KEYS.students, [], migrateStudents);
   const [attendance] = useLocalState<AttendanceRecord[]>(KEYS.attendance, []);
   const [payments] = useLocalState<Payment[]>(KEYS.payments, []);
 
-  const todaysRecords = attendance.filter((a) => a.date === today());
-  const presentToday = todaysRecords.filter((a) => a.status === "present").length;
+  const weekday = weekdayOf(today());
+  const todaysGroups = groups.filter((g) => g.sessions.some((s) => s.day === weekday));
+  const presentToday = attendance.filter(
+    (a) => a.date === today() && a.status === "present"
+  ).length;
   const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
-  const upcoming = schedule
-    .filter((s) => s.date >= today())
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    .slice(0, 5);
 
   return (
     <>
@@ -36,16 +37,16 @@ export default function Home() {
         <p className="page-subtitle">نظرة سريعة على الدروس</p>
 
         <div className="stats">
+          <Link href="/schedule" style={{ textDecoration: "none", color: "inherit" }}>
+            <div className="stat">
+              <div className="stat-value">{groups.length}</div>
+              <div className="stat-label">مجموعة</div>
+            </div>
+          </Link>
           <Link href="/students" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="stat">
               <div className="stat-value">{students.length}</div>
-              <div className="stat-label">التلاميذ</div>
-            </div>
-          </Link>
-          <Link href="/schedule" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="stat">
-              <div className="stat-value">{schedule.length}</div>
-              <div className="stat-label">موعد مسجّل</div>
+              <div className="stat-label">تلميذ</div>
             </div>
           </Link>
           <Link href="/attendance" style={{ textDecoration: "none", color: "inherit" }}>
@@ -63,24 +64,24 @@ export default function Home() {
         </div>
 
         <div className="card">
-          <div className="card-title">🗓️ أقرب المواعيد</div>
-          {upcoming.length === 0 ? (
-            <div className="empty">لا توجد مواعيد قادمة. <Link href="/schedule">أضف موعداً جديداً</Link></div>
+          <div className="card-title">📚 محاضرات اليوم</div>
+          {todaysGroups.length === 0 ? (
+            <div className="empty">لا توجد محاضرات اليوم. حدّد مواعيد من صفحة <Link href="/schedule">المواعيد</Link></div>
           ) : (
-            <>
-              {upcoming.map((s) => {
-                const st = students.find((x) => x.id === s.studentId);
-                return (
-                  <div key={s.id} className="list-item">
-                    <div className="main">
-                      <div style={{ fontWeight: 700 }}>{st?.name ?? "تلميذ محذوف"}</div>
-                      <div className="muted">{formatDate(s.date)} · الساعة {s.time}</div>
-                    </div>
-                    <Link className="btn-ghost btn-sm btn" href="/schedule" style={{ color: "var(--text)" }}>عرض</Link>
+            todaysGroups.map((g) => (
+              <div key={g.id} className="list-item">
+                <div className="main">
+                  <div style={{ fontWeight: 700 }}>👥 {g.name}</div>
+                  <div className="muted">
+                    {groupSessions(g)
+                      .filter((s) => s.day === weekday)
+                      .map((s) => s.time)
+                      .join(" ، ")}
                   </div>
-                );
-              })}
-            </>
+                </div>
+                <Link className="btn-green btn-sm btn" href="/attendance" style={{ textDecoration: "none" }}>تسجيل الحضور</Link>
+              </div>
+            ))
           )}
         </div>
       </main>

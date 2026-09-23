@@ -2,43 +2,49 @@
 
 import { useEffect, useState } from "react";
 
+export type Status = "present" | "absent";
+
+export type GroupSession = {
+  id: string;
+  day: number;
+  time: string;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  monthlyFee?: number;
+  sessions: GroupSession[];
+};
+
 export type Student = {
   id: string;
   name: string;
   phone?: string;
-  monthlyFee?: number;
-};
-
-export type ScheduleItem = {
-  id: string;
-  studentId: string;
-  date: string;
-  time: string;
-  notes?: string;
+  groupIds: string[];
 };
 
 export type AttendanceRecord = {
   id: string;
+  groupId: string;
   studentId: string;
   date: string;
-  status: "present" | "absent";
+  status: Status;
 };
 
 export type Payment = {
   id: string;
-  studentId: string;
+  groupId: string;
   date: string;
   amount: number;
   notes?: string;
 };
 
-export type Status = "present" | "absent";
-
 export const KEYS = {
+  groups: "mama_groups",
   students: "mama_students",
-  schedule: "mama_schedule",
-  attendance: "mama_attendance",
-  payments: "mama_payments",
+  attendance: "mama_attendance_v2",
+  payments: "mama_payments_v2",
 } as const;
 
 export function useLocalState<T>(key: string, initial: T, migrate?: (raw: unknown) => T) {
@@ -69,12 +75,9 @@ export const migrateStudents = (raw: unknown): Student[] =>
     id: String(s.id),
     name: String(s.name),
     phone: typeof s.phone === "string" ? s.phone : undefined,
-    monthlyFee:
-      typeof s.monthlyFee === "number"
-        ? s.monthlyFee
-        : typeof s.costPerLesson === "number"
-          ? (s.costPerLesson as number)
-          : undefined,
+    groupIds: Array.isArray(s.groupIds)
+      ? (s.groupIds as string[])
+      : (s.groupId ? [String(s.groupId)] : []),
   }));
 
 export const uid = () =>
@@ -111,3 +114,33 @@ export const formatDate = (iso: string) => {
 
 export const formatMoney = (n: number) =>
   `${n.toLocaleString("ar-EG")} ج.م`;
+
+export const DAY_NAMES = [
+  "الأحد",
+  "الاثنين",
+  "الثلاثاء",
+  "الأربعاء",
+  "الخميس",
+  "الجمعة",
+  "السبت",
+];
+
+export const WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5];
+
+export const dayName = (d: number) => DAY_NAMES[d] ?? String(d);
+
+export const weekdayOf = (date: string) =>
+  new Date(date + "T00:00:00").getDay();
+
+export const todayWeekday = () => weekdayOf(today());
+
+export const sessionsOfGroupOnWeekday = (g: Group, weekday: number) =>
+  g.sessions.filter((s) => s.day === weekday);
+
+export const groupSessions = (g: Group) =>
+  [...g.sessions].sort((a, b) => {
+    const ai = WEEK_ORDER.indexOf(a.day);
+    const bi = WEEK_ORDER.indexOf(b.day);
+    if (ai !== bi) return ai - bi;
+    return a.time.localeCompare(b.time);
+  });

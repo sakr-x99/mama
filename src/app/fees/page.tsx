@@ -7,6 +7,7 @@ import {
   useLocalState,
   migrateStudents,
   type AttendanceRecord,
+  type Group,
   type Payment,
   type Student,
   uid,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/store";
 
 export default function Fees() {
+  const [groups, setGroups] = useLocalState<Group[]>(KEYS.groups, []);
   const [students] = useLocalState<Student[]>(KEYS.students, [], migrateStudents);
   const [attendance] = useLocalState<AttendanceRecord[]>(KEYS.attendance, []);
   const [payments, setPayments] = useLocalState<Payment[]>(KEYS.payments, []);
@@ -27,13 +29,13 @@ export default function Fees() {
   const [payDate, setPayDate] = useState(today());
   const [pNotes, setPNotes] = useState("");
 
-  const addPayment = (e: React.FormEvent, studentId: string) => {
+  const addPayment = (e: React.FormEvent, groupId: string) => {
     e.preventDefault();
     const value = parseFloat(amount);
     if (!payFor || !value || value <= 0) return;
     setPayments([
       ...payments,
-      { id: uid(), studentId, date: payDate, amount: value, notes: pNotes.trim() || undefined },
+      { id: uid(), groupId, date: payDate, amount: value, notes: pNotes.trim() || undefined },
     ]);
     setAmount("");
     setPNotes("");
@@ -45,23 +47,32 @@ export default function Fees() {
     setPayments(payments.filter((p) => p.id !== id));
   };
 
+  const updateFee = (id: string, value: string) =>
+    setGroups(
+      groups.map((g) =>
+        g.id === id
+          ? { ...g, monthlyFee: parseFloat(value) > 0 ? parseFloat(value) : undefined }
+          : g
+      )
+    );
+
   const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
 
-  const rows = students.map((s) => {
+  const rows = groups.map((g) => {
     const paid = payments
-      .filter((p) => p.studentId === s.id)
+      .filter((p) => p.groupId === g.id)
       .reduce((sum, p) => sum + (p.amount || 0), 0);
     const months = new Set(
-      attendance
-        .filter((a) => a.studentId === s.id)
-        .map((a) => monthOf(a.date))
+      attendance.filter((a) => a.groupId === g.id).map((a) => monthOf(a.date))
     );
     const monthsCount = months.size;
-    const feePerMonth = s.monthlyFee ?? 0;
+    const feePerMonth = g.monthlyFee ?? 0;
     const due = feePerMonth * monthsCount;
     const balance = due - paid;
+    const members = students.filter((s) => s.groupIds.includes(g.id));
     return {
-      student: s,
+      group: g,
+      members,
       paid,
       monthsCount,
       months: [...months].sort().reverse(),
@@ -69,21 +80,21 @@ export default function Fees() {
       due,
       balance,
       payments: payments
-        .filter((p) => p.studentId === s.id)
+        .filter((p) => p.groupId === g.id)
         .sort((a, b) => b.date.localeCompare(a.date)),
     };
   });
 
   const dueTotal = rows.reduce((s, r) => s + r.due, 0);
   const balanceTotal = rows.reduce((s, r) => s + Math.max(r.balance, 0), 0);
-  const showHint = students.some((s) => !s.monthlyFee);
+  const showHint = groups.some((g) => !g.monthlyFee);
 
   return (
     <>
       <Nav />
       <main className="container">
-        <h1 className="page-title">فلوس الدرس 💰</h1>
-        <p className="page-subtitle">الفلوس بالشهر: المستحق = (رسوم الشهر × عدد الشهور اللي اتدرس فيها) − المدفوع</p>
+        <h1 className="page-title">فلوس المجموعات 💰</h1>
+        <p className="page-subtitle">فلوس كل مجموعة بالشهر: المستحق = (فلوس المجموعة × شهور المحاضرات) − المدفوع</p>
 
         <div className="stats">
           <div className="stat">
@@ -99,65 +110,72 @@ export default function Fees() {
             <div className="stat-label">إجمالي المتبقي</div>
           </div>
           <div className="stat">
-            <div className="stat-value">{students.length}</div>
-            <div className="stat-label">تلميذ</div>
+            <div className="stat-value">{groups.length}</div>
+            <div className="stat-label">مجموعة</div>
           </div>
         </div>
 
         {showHint && (
           <div className="card" style={{ background: "var(--amber-bg)", borderColor: "#f0d9a8" }}>
-            💡 <b>نصيحة:</b> حدد "رسوم الشهر" لكل تلميذ في صفحة التلاميذ ليتم حساب المستحق تلقائيًا.
+            💡 <b>نصيحة:</b> حدد "فلوس المجموعة في الشهر" في صفحة المواعيد ليتم حساب المستحق تلقائيًا.
           </div>
         )}
 
-        {students.length === 0 ? (
+        {groups.length === 0 ? (
           <div className="empty">
-            لا يوجد تلاميذ بعد. <a href="/students" style={{ color: "var(--primary)" }}>أضف تلاميذك أولاً</a>
+            لا توجد مجموعات بعد. <a href="/schedule" style={{ color: "var(--primary)" }}>أنشئ مجموعة من صفحة المواعيد</a>
           </div>
         ) : (
           rows.map((r) => (
-            <div key={r.student.id} className="card">
+            <div key={r.group.id} className="card">
               <div className="row">
-                <div style={{ fontWeight: 800, fontSize: 16 }}>{r.student.name}</div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>👥 {r.group.name}</div>
                 <div className="row" style={{ gap: 10 }}>
-                  <span className="muted">
-                    شهور: <b>{r.monthsCount}</b>
-                    {r.feePerMonth > 0 && <> · رسوم الشهر {formatMoney(r.feePerMonth)}</>}
-                  </span>
+                  <span className="muted">{r.members.length} تلميذ</span>
                   <span className={`chip ${r.balance <= 0 ? "chip-green" : "chip-red"}`}>
-                    {r.balance <= 0
-                      ? `سُدد بالكامل ✓`
-                      : `متبقي ${formatMoney(r.balance)}`}
+                    {r.balance <= 0 ? "سُددت بالكامل ✓" : `متبقي ${formatMoney(r.balance)}`}
                   </span>
                 </div>
               </div>
 
               <div className="row" style={{ marginTop: 12 }}>
-                <span className="muted">
+                <div className="field" style={{ minWidth: 200 }}>
+                  <label>فلوس المجموعة في الشهر (ج.م)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    dir="ltr"
+                    value={r.group.monthlyFee ?? ""}
+                    placeholder="بدون"
+                    onChange={(e) => updateFee(r.group.id, e.target.value)}
+                  />
+                </div>
+                <span className="muted" style={{ marginTop: 24 }}>
                   المدفوع: <b>{formatMoney(r.paid)}</b> من المستحق <b>{formatMoney(r.due)}</b>
                 </span>
                 <button
                   className="btn-primary btn-sm"
                   type="button"
+                  style={{ marginTop: 24 }}
                   onClick={() => {
-                    setPayFor(payFor === r.student.id ? null : r.student.id);
+                    setPayFor(payFor === r.group.id ? null : r.group.id);
                     setAmount("");
                     setPNotes("");
                     setPayDate(today());
                   }}
                 >
-                  {payFor === r.student.id ? "إغلاق" : "➕ تسجيل دفع"}
+                  {payFor === r.group.id ? "إغلاق" : "➕ تسجيل دفع"}
                 </button>
               </div>
 
               {r.monthsCount > 0 && (
                 <div className="muted" style={{ marginTop: 8 }}>
-                  الشهور المحسوبة: {r.months.map((m) => formatMonth(m)).join("، ")}
+                  شهور المحاضرات: {r.monthsCount} — {r.months.map((m) => formatMonth(m)).join("، ")}
                 </div>
               )}
 
-              {payFor === r.student.id && (
-                <form className="pay-row" style={{ marginTop: 12, alignItems: "flex-end" }} onSubmit={(e) => addPayment(e, r.student.id)}>
+              {payFor === r.group.id && (
+                <form className="pay-row" style={{ marginTop: 12, alignItems: "flex-end" }} onSubmit={(e) => addPayment(e, r.group.id)}>
                   <div className="field">
                     <label>الدفع (ج.م) *</label>
                     <input

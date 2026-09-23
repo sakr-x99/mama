@@ -6,15 +6,24 @@ import {
   KEYS,
   useLocalState,
   migrateStudents,
+  type Group,
   type Student,
   uid,
 } from "@/lib/store";
 
 export default function Students() {
   const [students, setStudents] = useLocalState<Student[]>(KEYS.students, [], migrateStudents);
+  const [groups] = useLocalState<Group[]>(KEYS.groups, []);
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [fee, setFee] = useState("");
+  const [pickedGroups, setPickedGroups] = useState<string[]>([]);
+  const [addStudentTo, setAddStudentTo] = useState<string>("");
+
+  const togglePicked = (id: string) =>
+    setPickedGroups((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
 
   const addStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,12 +35,12 @@ export default function Students() {
         id: uid(),
         name: trimmed,
         phone: phone.trim() || undefined,
-        monthlyFee: parseFloat(fee) > 0 ? parseFloat(fee) : undefined,
+        groupIds: pickedGroups,
       },
     ]);
     setName("");
     setPhone("");
-    setFee("");
+    setPickedGroups([]);
   };
 
   const remove = (id: string) => {
@@ -39,57 +48,86 @@ export default function Students() {
     setStudents(students.filter((s) => s.id !== id));
   };
 
-  const updateFee = (id: string, value: string) => {
+  const addToGroup = (studentId: string, groupId: string) => {
+    if (!groupId) return;
     setStudents(
       students.map((s) =>
-        s.id === id
-          ? { ...s, monthlyFee: parseFloat(value) > 0 ? parseFloat(value) : undefined }
+        s.id === studentId
+          ? { ...s, groupIds: s.groupIds.includes(groupId) ? s.groupIds : [...s.groupIds, groupId] }
           : s
       )
     );
+    setAddStudentTo("");
   };
+
+  const removeFromGroup = (studentId: string, groupId: string) =>
+    setStudents(
+      students.map((s) =>
+        s.id === studentId
+          ? { ...s, groupIds: s.groupIds.filter((g) => g !== groupId) }
+          : s
+      )
+    );
+
+  const availableGroupsFor = (s: Student) =>
+    groups.filter((g) => !s.groupIds.includes(g.id));
+
+  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? "مجموعة محذوفة";
 
   return (
     <>
       <Nav />
       <main className="container">
-        <h1 className="page-title">التلاميذ</h1>
-        <p className="page-subtitle">أدخل أسماء تلاميذك، ويمكنك إضافة رقم الوالدين ورسوم الشهر اختياريًا</p>
+        <h1 className="page-title">التلاميذ 📋</h1>
+        <p className="page-subtitle">أدخل اسم التلميذ وسجّله في مجموعاته (يقدر يبقى في أكتر من مجموعة)</p>
 
         <div className="card">
-          <form className="form-row" onSubmit={addStudent}>
-            <div className="field">
-              <label>اسم التلميذ *</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="مثال: أحمد محمد"
-                required
-              />
+          <form onSubmit={addStudent}>
+            <div className="form-row">
+              <div className="field">
+                <label>اسم التلميذ *</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="مثال: أحمد محمد"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>رقم الهاتف</label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="اختياري"
+                  dir="ltr"
+                />
+              </div>
             </div>
-            <div className="field">
-              <label>رقم الهاتف</label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="اختياري"
-                dir="ltr"
-              />
+
+            <div style={{ marginBottom: 14 }}>
+              <div className="field">
+                <label>المجموعات</label>
+                {groups.length === 0 ? (
+                  <div className="muted">لا توجد مجموعات بعد — أنشئها من صفحة <a href="/schedule" style={{ color: "var(--primary)" }}>المواعيد</a></div>
+                ) : (
+                  <div className="row" style={{ justifyContent: "flex-start", gap: 12, alignItems: "center" }}>
+                    {groups.map((g) => (
+                      <label key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={pickedGroups.includes(g.id)}
+                          onChange={() => togglePicked(g.id)}
+                          style={{ width: "auto" }}
+                        />
+                        {g.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="field">
-              <label>رسوم الشهر (ج.م)</label>
-              <input
-                type="number"
-                min="0"
-                value={fee}
-                onChange={(e) => setFee(e.target.value)}
-                placeholder="اختياري"
-                dir="ltr"
-              />
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
-              <button className="btn-primary" type="submit">➕ إضافة</button>
-            </div>
+
+            <button className="btn-primary" type="submit">➕ إضافة التلميذ</button>
           </form>
         </div>
 
@@ -104,7 +142,8 @@ export default function Students() {
                     <th>#</th>
                     <th>الاسم</th>
                     <th>الهاتف</th>
-                    <th>رسوم الشهر</th>
+                    <th>المجموعات</th>
+                    <th style={{ width: 170 }}>إضافة لمجموعة</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -117,15 +156,30 @@ export default function Students() {
                         <a href={`tel:${s.phone}`} style={{ color: "var(--primary)" }}>{s.phone}</a>
                       ) : "—"}</td>
                       <td>
-                        <input
-                          type="number"
-                          min="0"
-                          dir="ltr"
-                          style={{ width: 110 }}
-                          value={s.monthlyFee ?? ""}
-                          placeholder="بدون"
-                          onChange={(e) => updateFee(s.id, e.target.value)}
-                        />
+                        {s.groupIds.length === 0 && <span className="muted">بدون مجموعة</span>}
+                        {s.groupIds.map((gid) => (
+                          <span key={gid} className="chip chip-green" style={{ marginInlineEnd: 6 }}>
+                            {groupName(gid)}{" "}
+                            <span
+                              role="button"
+                              style={{ cursor: "pointer", marginInlineStart: 4 }}
+                              onClick={() => removeFromGroup(s.id, gid)}
+                              title="إزالة من المجموعة"
+                            >
+                              ✕
+                            </span>
+                          </span>
+                        ))}
+                      </td>
+                      <td>
+                        {availableGroupsFor(s).length > 0 && (
+                          <select value={addStudentTo} onChange={(e) => addToGroup(s.id, e.target.value)} style={{ width: 150 }}>
+                            <option value="">إضافة...</option>
+                            {availableGroupsFor(s).map((g) => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                       <td>
                         <button className="btn-danger btn-sm" onClick={() => remove(s.id)}>🗑 حذف</button>
@@ -136,8 +190,7 @@ export default function Students() {
               </table>
             </div>
             <div className="muted" style={{ marginTop: 10 }}>
-              إجمالي التلاميذ: <b>{students.length}</b> — والمدفوعات كلها تُحفظ تلقائيًا على جهازك
-              {students.some((s) => s.monthlyFee) && ` · رسوم الشهر تُستخدم لحساب المستحقات في صفحة الفلوس`}
+              إجمالي التلاميذ: <b>{students.length}</b> · المجموعات: <b>{groups.length}</b> — كل البيانات تُحفظ تلقائيًا على جهازك
             </div>
           </div>
         )}
