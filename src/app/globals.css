@@ -389,3 +389,116 @@ details summary {
   gap: 8px;
   margin-bottom: 8px;
 }
+
+/* ---------- responsive / mobile ---------- */
+@media (max-width: 640px) {
+  .container {
+    padding: 14px 12px 70px;
+  }
+
+  .page-title {
+    font-size: 19px;
+  }
+
+  .nav-inner {
+    padding: 8px 10px;
+  }
+
+  .nav-link {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat {
+    padding: 12px 8px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .field {
+    min-width: 120px;
+  }
+
+  button {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+    padding: 5px 10px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .pay-row .field {
+    min-width: 100%;
+  }
+
+  .list-item {
+    padding: 10px 12px;
+  }
+}
+
+/* تحويل الجداول لبطاقات على الموبايل */
+@media (max-width: 640px) {
+  table.responsive thead {
+    display: none;
+  }
+
+  table.responsive,
+  table.responsive tbody,
+  table.responsive tr,
+  table.responsive td {
+    display: block;
+    width: 100%;
+  }
+
+  table.responsive tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    background: #fafbfe;
+  }
+
+  table.responsive td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+  }
+
+  table.responsive td:last-child {
+    border-bottom: none;
+  }
+
+  table.responsive td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  table.responsive td input,
+  table.responsive td select {
+    width: 150px;
+  }
+}

@@ -136,7 +136,7 @@ export default function Students() {
         ) : (
           <div className="card">
             <div className="table-wrap">
-              <table>
+              <table className="responsive">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -150,12 +150,12 @@ export default function Students() {
                 <tbody>
                   {students.map((s, i) => (
                     <tr key={s.id}>
-                      <td className="muted">{i + 1}</td>
-                      <td style={{ fontWeight: 700 }}>{s.name}</td>
-                      <td dir="ltr">{s.phone ? (
+                      <td data-label="#"><span className="muted">{i + 1}</span></td>
+                      <td data-label="الاسم" style={{ fontWeight: 700 }}>{s.name}</td>
+                      <td data-label="الهاتف" dir="ltr">{s.phone ? (
                         <a href={`tel:${s.phone}`} style={{ color: "var(--primary)" }}>{s.phone}</a>
                       ) : "—"}</td>
-                      <td>
+                      <td data-label="المجموعات">
                         {s.groupIds.length === 0 && <span className="muted">بدون مجموعة</span>}
                         {s.groupIds.map((gid) => (
                           <span key={gid} className="chip chip-green" style={{ marginInlineEnd: 6 }}>
@@ -171,9 +171,9 @@ export default function Students() {
                           </span>
                         ))}
                       </td>
-                      <td>
+                      <td data-label="إضافة">
                         {availableGroupsFor(s).length > 0 && (
-                          <select value={addStudentTo} onChange={(e) => addToGroup(s.id, e.target.value)} style={{ width: 150 }}>
+                          <select value={addStudentTo} onChange={(e) => addToGroup(s.id, e.target.value)}>
                             <option value="">إضافة...</option>
                             {availableGroupsFor(s).map((g) => (
                               <option key={g.id} value={g.id}>{g.name}</option>
@@ -181,7 +181,7 @@ export default function Students() {
                           </select>
                         )}
                       </td>
-                      <td>
+                      <td data-label="">
                         <button className="btn-danger btn-sm" onClick={() => remove(s.id)}>🗑 حذف</button>
                       </td>
                     </tr>

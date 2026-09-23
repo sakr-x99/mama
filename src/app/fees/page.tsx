@@ -204,17 +204,17 @@ export default function Fees() {
                 <details>
                   <summary>سجل الدفعات ({r.payments.length})</summary>
                   <div className="table-wrap" style={{ marginTop: 8 }}>
-                    <table>
+                    <table className="responsive">
                       <thead>
                         <tr><th>اليوم</th><th>المبلغ</th><th>ملاحظات</th><th></th></tr>
                       </thead>
                       <tbody>
                         {r.payments.map((p) => (
                           <tr key={p.id}>
-                            <td>{formatDate(p.date)}</td>
-                            <td style={{ fontWeight: 700, color: "var(--green)" }}>{formatMoney(p.amount)}</td>
-                            <td className="muted">{p.notes ?? "—"}</td>
-                            <td><button className="btn-danger btn-sm" onClick={() => removePayment(p.id)}>🗑</button></td>
+                            <td data-label="اليوم">{formatDate(p.date)}</td>
+                            <td data-label="المبلغ" style={{ fontWeight: 700, color: "var(--green)" }}>{formatMoney(p.amount)}</td>
+                            <td data-label="ملاحظات" className="muted">{p.notes ?? "—"}</td>
+                            <td data-label=""><button className="btn-danger btn-sm" onClick={() => removePayment(p.id)}>🗑</button></td>
                           </tr>
                         ))}
                       </tbody>
