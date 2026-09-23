@@ -6,7 +6,7 @@ export type Student = {
   id: string;
   name: string;
   phone?: string;
-  costPerLesson?: number;
+  monthlyFee?: number;
 };
 
 export type ScheduleItem = {
@@ -41,13 +41,13 @@ export const KEYS = {
   payments: "mama_payments",
 } as const;
 
-export function useLocalState<T>(key: string, initial: T) {
+export function useLocalState<T>(key: string, initial: T, migrate?: (raw: unknown) => T) {
   const [value, setValue] = useState<T>(initial);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(key);
-      if (raw) setValue(JSON.parse(raw) as T);
+      if (raw) setValue(migrate ? migrate(JSON.parse(raw)) : (JSON.parse(raw) as T));
     } catch {
       /* ignore */
     }
@@ -64,10 +64,37 @@ export function useLocalState<T>(key: string, initial: T) {
   return [value, setValue] as const;
 }
 
+export const migrateStudents = (raw: unknown): Student[] =>
+  (raw as Array<Record<string, unknown>>).map((s) => ({
+    id: String(s.id),
+    name: String(s.name),
+    phone: typeof s.phone === "string" ? s.phone : undefined,
+    monthlyFee:
+      typeof s.monthlyFee === "number"
+        ? s.monthlyFee
+        : typeof s.costPerLesson === "number"
+          ? (s.costPerLesson as number)
+          : undefined,
+  }));
+
 export const uid = () =>
   Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 
 export const today = () => new Date().toISOString().slice(0, 10);
+
+export const monthOf = (date: string) => date.slice(0, 7);
+
+export const formatMonth = (ym: string) => {
+  try {
+    const [y, m] = ym.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("ar-EG", {
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return ym;
+  }
+};
 
 export const formatDate = (iso: string) => {
   try {

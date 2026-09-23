@@ -5,17 +5,20 @@ import Nav from "@/components/Nav";
 import {
   KEYS,
   useLocalState,
+  migrateStudents,
   type AttendanceRecord,
   type Payment,
   type Student,
   uid,
   today,
+  monthOf,
+  formatMonth,
   formatDate,
   formatMoney,
 } from "@/lib/store";
 
 export default function Fees() {
-  const [students] = useLocalState<Student[]>(KEYS.students, []);
+  const [students] = useLocalState<Student[]>(KEYS.students, [], migrateStudents);
   const [attendance] = useLocalState<AttendanceRecord[]>(KEYS.attendance, []);
   const [payments, setPayments] = useLocalState<Payment[]>(KEYS.payments, []);
 
@@ -48,23 +51,39 @@ export default function Fees() {
     const paid = payments
       .filter((p) => p.studentId === s.id)
       .reduce((sum, p) => sum + (p.amount || 0), 0);
-    const attended = attendance.filter(
-      (a) => a.studentId === s.id && a.status === "present"
-    ).length;
-    const cost = s.costPerLesson ?? 0;
-    const due = cost * attended;
+    const months = new Set(
+      attendance
+        .filter((a) => a.studentId === s.id)
+        .map((a) => monthOf(a.date))
+    );
+    const monthsCount = months.size;
+    const feePerMonth = s.monthlyFee ?? 0;
+    const due = feePerMonth * monthsCount;
     const balance = due - paid;
-    return { student: s as Student, paid, attended, cost, balance, payments: payments.filter((p) => p.studentId === s.id).sort((a, b) => b.date.localeCompare(a.date)) };
+    return {
+      student: s,
+      paid,
+      monthsCount,
+      months: [...months].sort().reverse(),
+      feePerMonth,
+      due,
+      balance,
+      payments: payments
+        .filter((p) => p.studentId === s.id)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    };
   });
 
-  const showHint = students.some((s) => !s.costPerLesson);
+  const dueTotal = rows.reduce((s, r) => s + r.due, 0);
+  const balanceTotal = rows.reduce((s, r) => s + Math.max(r.balance, 0), 0);
+  const showHint = students.some((s) => !s.monthlyFee);
 
   return (
     <>
       <Nav />
       <main className="container">
         <h1 className="page-title">فلوس الدرس 💰</h1>
-        <p className="page-subtitle">سجّل الدفعات، والحساب يتم تلقائيًا حسب الحضور وسعر الدرس</p>
+        <p className="page-subtitle">الفلوس بالشهر: المستحق = (رسوم الشهر × عدد الشهور اللي اتدرس فيها) − المدفوع</p>
 
         <div className="stats">
           <div className="stat">
@@ -72,20 +91,22 @@ export default function Fees() {
             <div className="stat-label">إجمالي المحصَّل</div>
           </div>
           <div className="stat">
-            <div className="stat-value">{students.length}</div>
-            <div className="stat-label">تلميذ</div>
+            <div className="stat-value" style={{ color: "var(--amber)" }}>{formatMoney(dueTotal)}</div>
+            <div className="stat-label">إجمالي المستحق</div>
           </div>
           <div className="stat">
-            <div className="stat-value">
-              {formatMoney(rows.reduce((s, r) => s + Math.max(r.balance, 0), 0))}
-            </div>
-            <div className="stat-label">مستحق (المتبقي)</div>
+            <div className="stat-value" style={{ color: "var(--red)" }}>{formatMoney(balanceTotal)}</div>
+            <div className="stat-label">إجمالي المتبقي</div>
+          </div>
+          <div className="stat">
+            <div className="stat-value">{students.length}</div>
+            <div className="stat-label">تلميذ</div>
           </div>
         </div>
 
         {showHint && (
           <div className="card" style={{ background: "var(--amber-bg)", borderColor: "#f0d9a8" }}>
-            💡 <b>نصيحة:</b> حدد "سعر الدرس" لكل تلميذ في صفحة التلاميذ ليتم حساب المتبقي تلقائيًا.
+            💡 <b>نصيحة:</b> حدد "رسوم الشهر" لكل تلميذ في صفحة التلاميذ ليتم حساب المستحق تلقائيًا.
           </div>
         )}
 
@@ -100,18 +121,20 @@ export default function Fees() {
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{r.student.name}</div>
                 <div className="row" style={{ gap: 10 }}>
                   <span className="muted">
-                    دروس حضرها: <b>{r.attended}</b>
-                    {r.cost > 0 && <> · سعر الدرس {formatMoney(r.cost)}</>}
+                    شهور: <b>{r.monthsCount}</b>
+                    {r.feePerMonth > 0 && <> · رسوم الشهر {formatMoney(r.feePerMonth)}</>}
                   </span>
                   <span className={`chip ${r.balance <= 0 ? "chip-green" : "chip-red"}`}>
-                    {r.balance <= 0 ? `مدفوع ✓ (المتبقي ${formatMoney(0)})` : `متبقي ${formatMoney(r.balance)}`}
+                    {r.balance <= 0
+                      ? `سُدد بالكامل ✓`
+                      : `متبقي ${formatMoney(r.balance)}`}
                   </span>
                 </div>
               </div>
 
               <div className="row" style={{ marginTop: 12 }}>
                 <span className="muted">
-                  دفعاته: <b>{formatMoney(r.paid)}</b>
+                  المدفوع: <b>{formatMoney(r.paid)}</b> من المستحق <b>{formatMoney(r.due)}</b>
                 </span>
                 <button
                   className="btn-primary btn-sm"
@@ -126,6 +149,12 @@ export default function Fees() {
                   {payFor === r.student.id ? "إغلاق" : "➕ تسجيل دفع"}
                 </button>
               </div>
+
+              {r.monthsCount > 0 && (
+                <div className="muted" style={{ marginTop: 8 }}>
+                  الشهور المحسوبة: {r.months.map((m) => formatMonth(m)).join("، ")}
+                </div>
+              )}
 
               {payFor === r.student.id && (
                 <form className="pay-row" style={{ marginTop: 12, alignItems: "flex-end" }} onSubmit={(e) => addPayment(e, r.student.id)}>
